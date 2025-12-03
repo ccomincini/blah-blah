@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+src-tauri/target/
+
+# Binaries (too large for git)
+src-tauri/binaries/whisper-*
+src-tauri/binaries/ffmpeg-*
+
+# Models (too large for git)
+src-tauri/models/
+*.bin
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Lock files (optional - uncomment if you want to track them)
+# package-lock.json
+# Cargo.lock
