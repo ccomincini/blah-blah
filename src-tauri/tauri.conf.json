@@ -57,7 +57,8 @@
         "binaries/whisper"
       ],
       "resources": [
-        "models/*"
+        "models/*",
+        "binaries/*.dll"
       ]
     },
     "security": {

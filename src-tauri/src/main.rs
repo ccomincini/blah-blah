@@ -120,6 +120,60 @@ fn get_model_path(app_handle: &AppHandle) -> Result<PathBuf, String> {
     Err(format!("Modello non trovato. Cercato in: {:?}", resource_path))
 }
 
+/// Copia le DLL dalla cartella resources alla cartella dei binaries su Windows
+#[cfg(target_os = "windows")]
+fn setup_dlls(app_handle: &AppHandle) -> Result<(), String> {
+    use std::path::PathBuf;
+    
+    // Trova la directory dove sono i sidecar (whisper.exe, ffmpeg.exe)
+    let sidecar_dir = app_handle
+        .path_resolver()
+        .resolve_resource("")
+        .ok_or("Impossibile trovare la directory risorse")?
+        .parent()
+        .map(|p| p.to_path_buf())
+        .ok_or("Impossibile trovare la directory parent")?;
+    
+    // In alternativa, trova la directory dell'eseguibile principale
+    let exe_dir = std::env::current_exe()
+        .map_err(|e| format!("Errore trovando exe: {}", e))?
+        .parent()
+        .map(|p| p.to_path_buf())
+        .ok_or("Impossibile trovare directory exe")?;
+    
+    // Cerca le DLL nelle risorse
+    if let Some(resources_dir) = app_handle.path_resolver().resolve_resource("") {
+        if let Ok(entries) = fs::read_dir(&resources_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if let Some(ext) = path.extension() {
+                    if ext == "dll" {
+                        let dll_name = path.file_name().unwrap();
+                        let dest_path = exe_dir.join(dll_name);
+                        
+                        // Copia la DLL se non esiste già
+                        if !dest_path.exists() {
+                            if let Err(e) = fs::copy(&path, &dest_path) {
+                                eprintln!("Warning: impossibile copiare DLL {:?}: {}", dll_name, e);
+                            } else {
+                                println!("Copiata DLL: {:?}", dll_name);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    Ok(())
+}
+
+#[cfg(not(target_os = "windows"))]
+fn setup_dlls(_app_handle: &AppHandle) -> Result<(), String> {
+    // Su macOS/Linux non serve fare nulla
+    Ok(())
+}
+
 #[tauri::command]
 async fn transcribe(
     app_handle: AppHandle,
@@ -275,6 +329,13 @@ async fn transcribe(
 
 fn main() {
     tauri::Builder::default()
+        .setup(|app| {
+            // Setup DLL su Windows all'avvio
+            if let Err(e) = setup_dlls(&app.handle()) {
+                eprintln!("Warning: setup DLL fallito: {}", e);
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![transcribe])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
