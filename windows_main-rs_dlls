@@ -1,0 +1,42 @@
+/// Copia le DLL dalla cartella binaries/ alla cartella principale su Windows
+#[cfg(target_os = "windows")]
+fn setup_dlls(_app_handle: &AppHandle) -> Result<(), String> {
+    // Directory principale dell'app (dove sta Blah-Blah.exe, whisper.exe, ffmpeg.exe)
+    let exe_dir = std::env::current_exe()
+        .map_err(|e| format!("Errore trovando exe: {}", e))?
+        .parent()
+        .map(|p| p.to_path_buf())
+        .ok_or("Impossibile trovare directory exe")?;
+    
+    // Directory binaries/ dove Tauri mette le DLL come risorse
+    let binaries_dir = exe_dir.join("binaries");
+    
+    eprintln!("Setup DLL - exe_dir: {:?}", exe_dir);
+    eprintln!("Setup DLL - binaries_dir: {:?}", binaries_dir);
+    
+    if binaries_dir.exists() {
+        if let Ok(entries) = fs::read_dir(&binaries_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if let Some(ext) = path.extension() {
+                    if ext == "dll" {
+                        let dll_name = path.file_name().unwrap();
+                        let dest_path = exe_dir.join(dll_name);
+                        
+                        // Copia la DLL se non esiste già
+                        if !dest_path.exists() {
+                            match fs::copy(&path, &dest_path) {
+                                Ok(_) => eprintln!("Copiata DLL: {:?}", dll_name),
+                                Err(e) => eprintln!("Errore copia DLL {:?}: {}", dll_name, e),
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    } else {
+        eprintln!("Directory binaries non trovata: {:?}", binaries_dir);
+    }
+    
+    Ok(())
+}
