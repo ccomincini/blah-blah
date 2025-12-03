@@ -51,7 +51,7 @@
         "icons/icon.ico"
       ],
       "identifier": "com.blahblah.subtitles",
-      "targets": "all",
+      "targets": ["nsis"],
       "externalBin": [
         "binaries/ffmpeg",
         "binaries/whisper"

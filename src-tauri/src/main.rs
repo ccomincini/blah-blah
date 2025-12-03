@@ -120,30 +120,24 @@ fn get_model_path(app_handle: &AppHandle) -> Result<PathBuf, String> {
     Err(format!("Modello non trovato. Cercato in: {:?}", resource_path))
 }
 
-/// Copia le DLL dalla cartella resources alla cartella dei binaries su Windows
+/// Copia le DLL dalla cartella binaries/ alla cartella principale su Windows
 #[cfg(target_os = "windows")]
-fn setup_dlls(app_handle: &AppHandle) -> Result<(), String> {
-    use std::path::PathBuf;
-    
-    // Trova la directory dove sono i sidecar (whisper.exe, ffmpeg.exe)
-    let sidecar_dir = app_handle
-        .path_resolver()
-        .resolve_resource("")
-        .ok_or("Impossibile trovare la directory risorse")?
-        .parent()
-        .map(|p| p.to_path_buf())
-        .ok_or("Impossibile trovare la directory parent")?;
-    
-    // In alternativa, trova la directory dell'eseguibile principale
+fn setup_dlls(_app_handle: &AppHandle) -> Result<(), String> {
+    // Directory principale dell'app (dove sta Blah-Blah.exe, whisper.exe, ffmpeg.exe)
     let exe_dir = std::env::current_exe()
         .map_err(|e| format!("Errore trovando exe: {}", e))?
         .parent()
         .map(|p| p.to_path_buf())
         .ok_or("Impossibile trovare directory exe")?;
     
-    // Cerca le DLL nelle risorse
-    if let Some(resources_dir) = app_handle.path_resolver().resolve_resource("") {
-        if let Ok(entries) = fs::read_dir(&resources_dir) {
+    // Directory binaries/ dove Tauri mette le DLL come risorse
+    let binaries_dir = exe_dir.join("binaries");
+    
+    eprintln!("Setup DLL - exe_dir: {:?}", exe_dir);
+    eprintln!("Setup DLL - binaries_dir: {:?}", binaries_dir);
+    
+    if binaries_dir.exists() {
+        if let Ok(entries) = fs::read_dir(&binaries_dir) {
             for entry in entries.flatten() {
                 let path = entry.path();
                 if let Some(ext) = path.extension() {
@@ -153,16 +147,17 @@ fn setup_dlls(app_handle: &AppHandle) -> Result<(), String> {
                         
                         // Copia la DLL se non esiste già
                         if !dest_path.exists() {
-                            if let Err(e) = fs::copy(&path, &dest_path) {
-                                eprintln!("Warning: impossibile copiare DLL {:?}: {}", dll_name, e);
-                            } else {
-                                println!("Copiata DLL: {:?}", dll_name);
+                            match fs::copy(&path, &dest_path) {
+                                Ok(_) => eprintln!("Copiata DLL: {:?}", dll_name),
+                                Err(e) => eprintln!("Errore copia DLL {:?}: {}", dll_name, e),
                             }
                         }
                     }
                 }
             }
         }
+    } else {
+        eprintln!("Directory binaries non trovata: {:?}", binaries_dir);
     }
     
     Ok(())
